@@ -1,0 +1,10 @@
+{
+  "source": {
+    "include": ["server.js", "config", "routes", "models", "middleware"],
+    "excludePattern": "node_modules"
+  },
+  "opts": {
+    "destination": "./docs",
+    "recurse": true
+  }
+}

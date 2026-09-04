@@ -1,0 +1,145 @@
+const express = require('express');
+const router = express.Router();
+const auth = require('../middleware/auth');
+const Task = require('../models/Task');
+const Joi = require('joi');
+const sanitizeHtml = require('sanitize-html');
+const logger = require('../config/logger');
+
+const sanitizeOptions = { allowedTags: [], allowedAttributes: {} };
+
+const taskSchema = Joi.object({
+  title: Joi.string().min(1).max(200).required().messages({
+    'string.empty': 'Le titre de la tâche est obligatoire.',
+    'any.required': 'Le titre de la tâche est obligatoire.',
+    'string.max': 'Le titre ne doit pas dépasser {#limit} caractères.',
+  }),
+  description: Joi.string().max(1000).allow('').optional().messages({
+    'string.max': 'La description ne doit pas dépasser {#limit} caractères.',
+  }),
+});
+
+/**
+ * Récupère toutes les tâches de l'utilisateur authentifié.
+ *
+ * @name GET /api/tasks
+ * @function
+ * @param {Object} req - Requête Express ; `req.user.id` provient du middleware d'authentification.
+ * @param {Object} res - Réponse Express.
+ * @returns {void} JSON : tableau des tâches (200), triées par date de création décroissante.
+ */
+router.get('/', auth, async (req, res) => {
+  try {
+    const tasks = await Task.find({ user: req.user.id }).sort({ createdAt: -1 });
+    res.json(tasks);
+  } catch (err) {
+    logger.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+/**
+ * Crée une nouvelle tâche pour l'utilisateur authentifié.
+ *
+ * Valide le corps avec Joi (titre obligatoire) et nettoie le titre et la
+ * description avec sanitize-html (protection XSS) avant enregistrement.
+ *
+ * @name POST /api/tasks
+ * @function
+ * @param {Object} req - Requête Express ; `req.body` contient `title` et éventuellement `description`.
+ * @param {Object} res - Réponse Express.
+ * @returns {void} JSON : la tâche créée (200) ou `{ msg }` (400 / 500).
+ */
+router.post('/', auth, async (req, res) => {
+  const { error } = taskSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({ msg: error.details[0].message });
+  }
+
+  const { title, description } = req.body;
+
+  // Un utilisateur pourrait injecter du HTML ou du script dans la description.
+  try {
+    const newTask = new Task({
+      title: sanitizeHtml(title, sanitizeOptions),
+      description: sanitizeHtml(description || '', sanitizeOptions),
+      user: req.user.id,
+    });
+
+    const task = await newTask.save();
+    res.json(task);
+  } catch (err) {
+    logger.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+/**
+ * Met à jour une tâche appartenant à l'utilisateur authentifié.
+ *
+ * Vérifie que la tâche existe et que l'utilisateur en est le propriétaire
+ * (protection IDOR) avant de la modifier ; nettoie les champs avec sanitize-html.
+ *
+ * @name PUT /api/tasks/:id
+ * @function
+ * @param {Object} req - Requête Express ; `req.params.id` = id de la tâche, `req.body` = champs à modifier.
+ * @param {Object} res - Réponse Express.
+ * @returns {void} JSON : la tâche mise à jour (200), `{ msg }` si non trouvée (404) ou non autorisée (403).
+ */
+// N'importe quel utilisateur authentifié peut modifier la tâche de n'importe qui d'autre s'il connaît l'ID de la tâche.
+// Il manque une vérification pour s'assurer que la tâche appartient bien à l'utilisateur qui fait la requête.
+router.put('/:id', auth, async (req, res) => {
+  const { title, description, isCompleted } = req.body;
+
+  try {
+    let task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ msg: 'Task not found' });
+
+    // ON VÉRIFIE QUE L'UTILISATEUR A LE DROIT DE MODIFIER CETTE TÂCHE (IL EN EST PROPRIÉTAIRE)
+    if (task.user.toString() !== req.user.id) {
+      return res.status(403).json({ msg: 'Accès refusé : cette tâche ne vous appartient pas' });
+    }
+
+    task = await Task.findByIdAndUpdate(req.params.id, { $set: { title: sanitizeHtml(title || '', sanitizeOptions), description: sanitizeHtml(description || '', sanitizeOptions), isCompleted } }, { new: true });
+
+    // Ici c'est corrigé, mais c'est un bug courant à surveiller.
+    res.json(task);
+  } catch (err) {
+    logger.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+/**
+ * Supprime une tâche appartenant à l'utilisateur authentifié.
+ *
+ * Vérifie l'existence de la tâche et la propriété de l'utilisateur (protection IDOR)
+ * avant suppression.
+ *
+ * @name DELETE /api/tasks/:id
+ * @function
+ * @param {Object} req - Requête Express ; `req.params.id` = id de la tâche.
+ * @param {Object} res - Réponse Express.
+ * @returns {void} JSON : `{ msg: 'Task removed' }` (200), ou `{ msg }` si non trouvée (404) / non autorisée (403).
+ */
+// Un utilisateur peut supprimer les tâches des autres.
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    let task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ msg: 'Task not found' });
+
+    // ON VÉRIFIE QUE L'UTILISATEUR A LE DROIT DE SUPPRIMER CETTE TÂCHE (IL EN EST PROPRIÉTAIRE)
+    if (task.user.toString() !== req.user.id) {
+      return res.status(403).json({ msg: 'Accès refusé : cette tâche ne vous appartient pas' });
+    }
+
+    await Task.findByIdAndRemove(req.params.id);
+
+    res.json({ msg: 'Task removed' });
+  } catch (err) {
+    logger.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+module.exports = router;
