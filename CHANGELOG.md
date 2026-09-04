@@ -44,6 +44,22 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/).
 - **HTTPS (E23)** : certificats TLS automatiques (Let's Encrypt) fournis par Render sur les
   deux services. Règle de réécriture `/* → /index.html` sur le Static Site pour le routing SPA.
 
+### Améliorations (E27)
+
+Fonctionnalités absentes repérées lors des tests (jamais implémentées dans le code
+d'origine — des manques, pas des bugs).
+
+**Réalisées :**
+- **Voir le détail d'une tâche** : clic sur le titre pour déplier et afficher sa
+  `description` (`frontend/src/pages/Tasks.js`).
+- **Marquer une tâche comme « terminée »** : case à cocher qui bascule `isCompleted`
+  via `PUT /api/tasks/:id` et met à jour la liste.
+- **Champ description à la création** : ajout d'un champ description dans le formulaire
+  (`frontend/src/components/TaskForm.js`), envoyé à l'API.
+
+- **Modifier une tâche** : bouton « Modifier » permettant d'éditer le titre et la
+  description d'une tâche existante, enregistré via `PUT /api/tasks/:id`.
+
 ### Corrigé (E27)
 
 - **Page d'inscription inaccessible depuis l'interface.** La route `/register` et le composant `Register` existaient, mais aucun lien de l'UI n'y menait : on n'avait accès qu'à la page de connexion.

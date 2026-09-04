@@ -11,6 +11,7 @@ import api from "../api";
  */
 const TaskForm = ({ addTask }) => {
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,13 +19,14 @@ const TaskForm = ({ addTask }) => {
     try {
       const res = await api.post(
         "/tasks",
-        { title },
+        { title, description },
         {
           headers: { "x-auth-token": token },
         }
       );
       addTask(res.data);
       setTitle("");
+      setDescription("");
     } catch (err) {
       console.error(err);
     }
@@ -37,6 +39,12 @@ const TaskForm = ({ addTask }) => {
         placeholder="Ajouter une tâche ..."
         value={title}
         onChange={(e) => setTitle(e.target.value)}
+      />
+      <textarea
+        placeholder="Description (optionnel) ..."
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        style={{ marginTop: "10px", width: "100%", boxSizing: "border-box" }}
       />
       <button type="submit" className="btn" style={{ marginTop: "10px" }}>
         Ajouter Tâche
