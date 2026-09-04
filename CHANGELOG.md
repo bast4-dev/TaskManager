@@ -29,6 +29,21 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/).
   (configuration `backend/jsdoc.json`, sortie dans `backend/docs/`).
 - Ce fichier `CHANGELOG.md` tient lieu de journal des évolutions.
 
+### Déploiement & CI/CD (E21–E24)
+
+- **Pipeline CI/CD GitHub Actions (E24)** : workflow `.github/workflows/ci.yml` déclenché
+  à chaque push/PR sur `main`. Trois jobs : installation + `npm audit` du backend,
+  installation + build + `npm audit` du frontend, et build des deux images Docker.
+- **URL d'API configurable selon l'environnement (E21)** : `frontend/src/api.js` lit
+  désormais `REACT_APP_API_URL` (repli sur `localhost:5000` en développement), pour
+  pointer vers le bon backend en dev / pré-prod / production.
+- **Hébergement cloud (E21, E22)** : backend déployé en **Web Service Docker** et frontend
+  en **Static Site** sur **Render** ; base de données sur **MongoDB Atlas** (cluster gratuit).
+  Secrets (`MONGO_URI`, `JWT_SECRET`, `FRONTEND_URL`, `REACT_APP_API_URL`) gérés via les
+  variables d'environnement de Render, jamais dans le code.
+- **HTTPS (E23)** : certificats TLS automatiques (Let's Encrypt) fournis par Render sur les
+  deux services. Règle de réécriture `/* → /index.html` sur le Static Site pour le routing SPA.
+
 ### Corrigé (E27)
 
 - **Page d'inscription inaccessible depuis l'interface.** La route `/register` et le composant `Register` existaient, mais aucun lien de l'UI n'y menait : on n'avait accès qu'à la page de connexion.
